@@ -7,9 +7,12 @@ from typing import Optional
 
 from hummingbot.core.clock cimport Clock
 from hummingbot.logger import HummingbotLogger
+from hummingbot.core.utils.async_utils import safe_ensure_future
+from hummingbot.core.time_iterator import TimeIterator
 
 NaN = float("nan")
-s_logger = None
+ni_logger = None
+
 
 class NetworkStatus(Enum):
     STOPPED = 0
@@ -17,14 +20,13 @@ class NetworkStatus(Enum):
     CONNECTED = 2
 
 
-
 cdef class NetworkIterator(TimeIterator):
     @classmethod
     def logger(cls) -> HummingbotLogger:
-        global s_logger
-        if s_logger is None:
-            s_logger = logging.getLogger(__name__)
-        return s_logger
+        global ni_logger
+        if ni_logger is None:
+            ni_logger = logging.getLogger(__name__)
+        return ni_logger
 
     def __init__(self):
         super().__init__()
@@ -115,7 +117,7 @@ cdef class NetworkIterator(TimeIterator):
 
     cdef c_start(self, Clock clock, double timestamp):
         TimeIterator.c_start(self, clock, timestamp)
-        self._check_network_task = asyncio.ensure_future(self._check_network_loop())
+        self._check_network_task = safe_ensure_future(self._check_network_loop())
         self._network_status = NetworkStatus.NOT_CONNECTED
 
     cdef c_stop(self, Clock clock):
@@ -124,4 +126,10 @@ cdef class NetworkIterator(TimeIterator):
             self._check_network_task.cancel()
             self._check_network_task = None
         self._network_status = NetworkStatus.STOPPED
-        asyncio.ensure_future(self.stop_network())
+        safe_ensure_future(self.stop_network())
+
+    def start(self, clock: Clock, timestamp: float):
+        self.c_start(clock, timestamp)
+
+    def stop(self, clock: Clock):
+        self.c_stop(clock)

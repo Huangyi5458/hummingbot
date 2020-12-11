@@ -26,9 +26,7 @@ class UserStreamTracker(ABC):
             cls._ust_logger = logging.getLogger(__name__)
         return cls._ust_logger
 
-    def __init__(self,
-                 data_source_type: UserStreamTrackerDataSourceType = UserStreamTrackerDataSourceType.EXCHANGE_API):
-        self._data_source_type: UserStreamTrackerDataSourceType = data_source_type
+    def __init__(self):
         self._user_stream: asyncio.Queue = asyncio.Queue()
         self._ev_loop: asyncio.BaseEventLoop = asyncio.get_event_loop()
 
@@ -36,6 +34,10 @@ class UserStreamTracker(ABC):
     @abstractmethod
     def data_source(self) -> UserStreamTrackerDataSource:
         raise NotImplementedError
+
+    @property
+    def last_recv_time(self) -> float:
+        return self.data_source.last_recv_time
 
     @abstractmethod
     async def start(self):

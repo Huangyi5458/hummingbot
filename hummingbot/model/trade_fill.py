@@ -4,12 +4,8 @@ import pandas as pd
 from typing import (
     Any,
     Dict,
-List,
-)
-from hummingbot.core.event.events import (
-    TradeType,
-    TradeFee,
-    OrderType,
+    List,
+    Optional,
 )
 from sqlalchemy import (
     Column,
@@ -21,7 +17,10 @@ from sqlalchemy import (
     Float,
     JSON
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import (
+    relationship,
+    Session
+)
 from datetime import datetime
 
 from . import HummingbotBase
@@ -31,14 +30,14 @@ class TradeFill(HummingbotBase):
     __tablename__ = "TradeFill"
     __table_args__ = (Index("tf_config_timestamp_index",
                             "config_file_path", "timestamp"),
-                      Index("tf_market_symbol_timestamp_index",
+                      Index("tf_market_trading_pair_timestamp_index",
                             "market", "symbol", "timestamp"),
                       Index("tf_market_base_asset_timestamp_index",
                             "market", "base_asset", "timestamp"),
                       Index("tf_market_quote_asset_timestamp_index",
                             "market", "quote_asset", "timestamp")
                       )
-        
+
     id = Column(Integer, primary_key=True, nullable=False)
     config_file_path = Column(Text, nullable=False)
     strategy = Column(Text, nullable=False)
@@ -63,39 +62,89 @@ class TradeFill(HummingbotBase):
             f"trade_type='{self.trade_type}', order_type='{self.order_type}', price={self.price}, " \
             f"amount={self.amount}, trade_fee={self.trade_fee}, exchange_trade_id={self.exchange_trade_id})"
 
+    @staticmethod
+    def get_trades(sql_session: Session,
+                   strategy: str = None,
+                   market: str = None,
+                   trading_pair: str = None,
+                   base_asset: str = None,
+                   quote_asset: str = None,
+                   trade_type: str = None,
+                   order_type: str = None,
+                   start_time: int = None,
+                   end_time: int = None,
+                   ) -> Optional[List["TradeFill"]]:
+        filters = []
+        if strategy is not None:
+            filters.append(TradeFill.strategy == strategy)
+        if market is not None:
+            filters.append(TradeFill.market == market)
+        if trading_pair is not None:
+            filters.append(TradeFill.symbol == trading_pair)
+        if base_asset is not None:
+            filters.append(TradeFill.base_asset == base_asset)
+        if quote_asset is not None:
+            filters.append(TradeFill.quote_asset == quote_asset)
+        if trade_type is not None:
+            filters.append(TradeFill.trade_type == trade_type)
+        if order_type is not None:
+            filters.append(TradeFill.order_type == order_type)
+        if start_time is not None:
+            filters.append(TradeFill.timestamp >= start_time)
+        if end_time is not None:
+            filters.append(TradeFill.timestamp <= end_time)
+
+        trades: Optional[List[TradeFill]] = (sql_session
+                                             .query(TradeFill)
+                                             .filter(*filters)
+                                             .order_by(TradeFill.timestamp.asc())
+                                             .all())
+        return trades
+
     @classmethod
     def to_pandas(cls, trades: List):
-        columns: List[str] = ["symbol",
-                              "price",
-                              "amount",
-                              "order_type",
-                              "trade_type",
-                              "market",
-                              "timestamp",
-                              "fee_percent",
-                              "flat_fee / gas"]
+        columns: List[str] = ["Index",
+                              "Timestamp",
+                              "Exchange",
+                              "Market",
+                              "Order_type",
+                              "Side",
+                              "Price",
+                              "Amount",
+                              "Age"]
         data = []
+        index = 0
         for trade in trades:
+            """
+            Comment out fees
             flat_fees: List[Dict[str, Any]] = trade.trade_fee["flat_fees"]
             if len(flat_fees) == 0:
                 flat_fee_str = "None"
             else:
-                fee_strs = [f"{fee_dict['amount']} {fee_dict['symbol']}" for fee_dict in flat_fees]
+                fee_strs = [f"{fee_dict['amount']} {fee_dict['asset']}" for fee_dict in flat_fees]
                 flat_fee_str = ",".join(fee_strs)
+            """
 
+            index += 1
+            # // indicates order is a paper order so 'n/a'. For real orders, calculate age.
+            age = "n/a"
+            if "//" not in trade.order_id:
+                age = pd.Timestamp(int(trade.timestamp / 1e3 - int(trade.order_id[-16:]) / 1e6), unit='s').strftime('%H:%M:%S')
             data.append([
+                index,
+                datetime.fromtimestamp(int(trade.timestamp / 1e3)).strftime("%Y-%m-%d %H:%M:%S"),
+                trade.market,
                 trade.symbol,
-                trade.price,
-                trade.amount,
                 trade.order_type.lower(),
                 trade.trade_type.lower(),
-                trade.market,
-                datetime.fromtimestamp(int(trade.timestamp / 1e3)).strftime("%Y-%m-%d %H:%M:%S"),
-                trade.trade_fee['percent'],
-                flat_fee_str,
+                trade.price,
+                trade.amount,
+                age,
             ])
+        df = pd.DataFrame(data=data, columns=columns)
+        df.set_index('Index', inplace=True)
 
-        return pd.DataFrame(data=data, columns=columns)
+        return df
 
     @staticmethod
     def to_bounty_api_json(trade_fill: "TradeFill") -> Dict[str, Any]:
@@ -104,7 +153,7 @@ class TradeFill(HummingbotBase):
             "trade_id": trade_fill.exchange_trade_id,
             "price": numpy.format_float_positional(trade_fill.price),
             "quantity": numpy.format_float_positional(trade_fill.amount),
-            "trading_pair": trade_fill.symbol,
+            "symbol": trade_fill.symbol,
             "trade_timestamp": trade_fill.timestamp,
             "trade_type": trade_fill.trade_type,
             "base_asset": trade_fill.base_asset,
@@ -113,5 +162,3 @@ class TradeFill(HummingbotBase):
                 "trade_fee": trade_fill.trade_fee,
             }
         }
-
-

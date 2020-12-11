@@ -7,7 +7,9 @@ import os
 import subprocess
 import sys
 
-if os.name == "posix":
+is_posix = (os.name == "posix")
+
+if is_posix:
     os_name = subprocess.check_output("uname").decode("utf8")
     if "Darwin" in os_name:
         os.environ["CFLAGS"] = "-stdlib=libc++ -std=c++11"
@@ -17,13 +19,12 @@ if os.name == "posix":
 
 def main():
     cpu_count = os.cpu_count() or 8
-    version = "20190812"
+    version = "20201123"
     packages = [
         "hummingbot",
         "hummingbot.client",
         "hummingbot.client.command",
         "hummingbot.client.config",
-        "hummingbot.client.liquidity_bounty",
         "hummingbot.client.ui",
         "hummingbot.core",
         "hummingbot.core.data_type",
@@ -33,19 +34,31 @@ def main():
         "hummingbot.data_feed",
         "hummingbot.logger",
         "hummingbot.market",
-        "hummingbot.market.bamboo_relay",
-        "hummingbot.market.binance",
-        "hummingbot.market.bittrex",
-        "hummingbot.market.coinbase_pro",
-        "hummingbot.market.ddex",
-        "hummingbot.market.huobi",
-        "hummingbot.market.idex",
-        "hummingbot.market.radar_relay",
+        "hummingbot.connector",
+        "hummingbot.connector.connector",
+        "hummingbot.connector.connector.balancer",
+        "hummingbot.connector.exchange",
+        "hummingbot.connector.exchange.binance",
+        "hummingbot.connector.exchange.bitfinex",
+        "hummingbot.connector.exchange.bittrex",
+        "hummingbot.connector.exchange.bamboo_relay",
+        "hummingbot.connector.exchange.coinbase_pro",
+        "hummingbot.connector.exchange.huobi",
+        "hummingbot.connector.exchange.radar_relay",
+        "hummingbot.connector.exchange.kraken",
+        "hummingbot.connector.exchange.crypto_com",
+        "hummingbot.connector.exchange.kucoin",
+        "hummingbot.connector.exchange.loopring",
+        "hummingbot.connector.exchange.okex",
+        "hummingbot.connector.derivative",
+        "hummingbot.connector.derivative.binance_perpetual",
+        "hummingbot.script",
         "hummingbot.strategy",
+        "hummingbot.strategy.amm_arb",
         "hummingbot.strategy.arbitrage",
         "hummingbot.strategy.cross_exchange_market_making",
-        "hummingbot.strategy.discovery",
         "hummingbot.strategy.pure_market_making",
+        "hummingbot.strategy.perpetual_market_making",
         "hummingbot.templates",
         "hummingbot.wallet",
         "hummingbot.wallet.ethereum",
@@ -56,23 +69,22 @@ def main():
     package_data = {
         "hummingbot": [
             "core/cpp/*",
-            "client/liquidity_bounty/*.txt",
-            "wallet/ethereum/zero_ex/zero_ex_coordinator_abi.json",
-            "wallet/ethereum/zero_ex/zero_ex_coordinator_registry_abi.json",
-            "wallet/ethereum/zero_ex/zero_ex_exchange_abi.json",
+            "wallet/ethereum/zero_ex/*.json",
             "wallet/ethereum/token_abi/*.json",
             "wallet/ethereum/erc20_tokens.json",
+            "wallet/ethereum/erc20_tokens_kovan.json",
             "VERSION",
             "templates/*TEMPLATE.yml"
         ],
     }
-    install_requires=[
+    install_requires = [
         "aioconsole",
         "aiokafka",
         "attrdict",
         "cytoolz",
         "eth-abi",
         "eth-account",
+        "eth-bloom",
         "eth-hash",
         "eth-keyfile",
         "eth-keys",
@@ -95,7 +107,7 @@ def main():
         "attrs",
         "certifi",
         "chardet",
-        "cython==0.29.5",
+        "cython==0.29.15",
         "idna",
         "idna_ssl",
         "multidict",
@@ -103,11 +115,19 @@ def main():
         "pandas",
         "pytz",
         "pyyaml",
-        "python-binance==0.6.9",
+        "python-binance==0.7.5",
         "sqlalchemy",
         "ujson",
         "yarl",
     ]
+
+    cython_kwargs = {
+        "language": "c++",
+        "language_level": 3,
+    }
+
+    if is_posix:
+        cython_kwargs["nthreads"] = cpu_count
 
     if "DEV_MODE" in os.environ:
         version += ".dev1"
@@ -116,27 +136,26 @@ def main():
         ]
         package_data["hummingbot"].append("core/cpp/*.cpp")
 
-    if len(sys.argv) > 1 and sys.argv[1] == "build_ext":
+    if len(sys.argv) > 1 and sys.argv[1] == "build_ext" and is_posix:
         sys.argv.append(f"--parallel={cpu_count}")
 
     setup(name="hummingbot",
           version=version,
-          description="CoinAlpha Hummingbot",
+          description="Hummingbot",
           url="https://github.com/CoinAlpha/hummingbot",
-          author="Martin Kou",
-          author_email="martin@coinalpha.com",
-          license="Proprietary",
+          author="CoinAlpha, Inc.",
+          author_email="dev@hummingbot.io",
+          license="Apache 2.0",
           packages=packages,
           package_data=package_data,
           install_requires=install_requires,
-          ext_modules=cythonize([
-              "hummingbot/**/*.pyx",
-          ], language="c++", language_level=3, nthreads=cpu_count),
+          ext_modules=cythonize(["hummingbot/**/*.pyx"], **cython_kwargs),
           include_dirs=[
-              np.get_include(),
+              np.get_include()
           ],
           scripts=[
-              "bin/hummingbot.py"
+              "bin/hummingbot.py",
+              "bin/hummingbot_quickstart.py"
           ],
           )
 

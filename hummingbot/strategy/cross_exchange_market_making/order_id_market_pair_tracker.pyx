@@ -6,17 +6,18 @@ NaN = float("nan")
 cdef class OrderIDMarketPairTrackingItem:
     cdef:
         public str order_id
+        public object exchange
         public object market_pair
         public double expiry_timestamp
 
-    def __init__(self, str order_id, object market_pair):
+    def __init__(self, str order_id, object exchange, object market_pair):
         self.order_id = order_id
+        self.exchange = exchange
         self.market_pair = market_pair
         self.expiry_timestamp = NaN
 
-
 cdef class OrderIDMarketPairTracker(TimeIterator):
-    def __init__(self, double expiry_timeout = 3 * 60):
+    def __init__(self, double expiry_timeout=3 * 60):
         super().__init__()
 
         self._order_id_to_tracking_item = OrderedDict()
@@ -34,8 +35,16 @@ cdef class OrderIDMarketPairTracker(TimeIterator):
             return item.market_pair
         return None
 
-    cdef c_start_tracking_order_id(self, str order_id, object market_pair):
-        self._order_id_to_tracking_item[order_id] = OrderIDMarketPairTrackingItem(order_id, market_pair)
+    cdef object c_get_exchange_from_order_id(self, str order_id):
+        cdef:
+            OrderIDMarketPairTrackingItem item = self._order_id_to_tracking_item.get(order_id)
+
+        if item is not None:
+            return item.exchange
+        return None
+
+    cdef c_start_tracking_order_id(self, str order_id, object exchange, object market_pair):
+        self._order_id_to_tracking_item[order_id] = OrderIDMarketPairTrackingItem(order_id, exchange, market_pair)
 
     cdef c_stop_tracking_order_id(self, str order_id):
         cdef:

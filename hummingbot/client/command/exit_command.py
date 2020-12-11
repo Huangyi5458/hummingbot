@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import asyncio
-from hummingbot.core.utils.exchange_rate_conversion import ExchangeRateConversion
+from hummingbot.core.utils.async_utils import safe_ensure_future
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class ExitCommand:
     def exit(self,  # type: HummingbotApplication
              force: bool = False):
-        asyncio.ensure_future(self.exit_loop(force), loop=self.ev_loop)
+        safe_ensure_future(self.exit_loop(force), loop=self.ev_loop)
 
     async def exit_loop(self,  # type: HummingbotApplication
                         force: bool = False):
@@ -26,11 +26,6 @@ class ExitCommand:
                 return
             # Freeze screen 1 second for better UI
             await asyncio.sleep(1)
-        ExchangeRateConversion.get_instance().stop()
-
-        if force is False and self.liquidity_bounty is not None:
-            self._notify("Winding down liquidity bounty submission...")
-            await self.liquidity_bounty.stop_network()
 
         self._notify("Winding down notifiers...")
         for notifier in self.notifiers:

@@ -16,9 +16,8 @@ cdef class StrategyBase(TimeIterator):
         EventListener _sb_expire_order_listener
         EventListener _sb_complete_buy_order_listener
         EventListener _sb_complete_sell_order_listener
-        double _sb_limit_order_min_expiration
         bint _sb_delegate_lock
-        OrderTracker _sb_order_tracker
+        public OrderTracker _sb_order_tracker
 
     cdef c_add_markets(self, list markets)
     cdef c_remove_markets(self, list markets)
@@ -37,9 +36,9 @@ cdef class StrategyBase(TimeIterator):
     cdef c_did_complete_buy_order_tracker(self, object order_completed_event)
     cdef c_did_complete_sell_order_tracker(self, object order_completed_event)
 
-    cdef str c_buy_with_specific_market(self, object market_symbol_pair, object amount,
+    cdef str c_buy_with_specific_market(self, object market_trading_pair_tuple, object amount,
                                         object order_type = *, object price = *, double expiration_seconds = *)
-    cdef str c_sell_with_specific_market(self, object market_symbol_pair, object amount,
+    cdef str c_sell_with_specific_market(self, object market_trading_pair_tuple, object amount,
                                          object order_type = *, object price = *, double expiration_seconds = *)
     cdef c_cancel_order(self, object market_pair, str order_id)
 
@@ -48,3 +47,6 @@ cdef class StrategyBase(TimeIterator):
     cdef c_stop_tracking_limit_order(self, object market_pair, str order_id)
     cdef c_start_tracking_market_order(self, object market_pair, str order_id, bint is_buy, object quantity)
     cdef c_stop_tracking_market_order(self, object market_pair, str order_id)
+    cdef object c_sum_flat_fees(self,
+                                str quote_currency,
+                                list flat_fees)

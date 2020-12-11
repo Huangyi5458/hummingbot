@@ -26,7 +26,7 @@ fabric.properties
 
 __pycache__
 .ipynb_checkpoints
-.pyc
+*.pyc
 
 # Cython objects
 /**/*.so
@@ -46,6 +46,7 @@ portfolio_value.csv
 /notebooks
 /data
 debug.log
+/installation/docker-commands/hummingbot_files
 
 # Distribution files
 /build
@@ -54,9 +55,15 @@ debug.log
 /*.egg-info
 *.whl
 
+
 # VSCode
 .vscode/
 .history/
 
 # Documentation build dir
 /documentation/site/
+
+# Gateway API files
+/certs
+*.pem
+gateway.env
